@@ -20,7 +20,7 @@ class HeartbeatPublisher(Node):
 
     def publish_heartbeat(self):
         msg = OffboardControlMode()
-        msg.position = True
+        msg.position = False
         msg.velocity = False
         msg.acceleration = False
         msg.attitude = False
