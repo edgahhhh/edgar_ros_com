@@ -14,18 +14,19 @@ class HeartbeatPublisher(Node):
         
         # Create a timer and a logger
         self.timer = self.create_timer(
-            1.0, self.publish_heartbeat)
+            0.1 , self.publish_heartbeat)
         
         self.get_logger().info('heartbeat_publisher_node started')
 
     def publish_heartbeat(self):
         msg = OffboardControlMode()
-        msg.position = False
+        msg.position = True
         msg.velocity = False
         msg.acceleration = False
         msg.attitude = False
         msg.body_rate = False
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+        self.publisher.publish(msg)
 
 def main(args=None):
     print('Starting heartbeat signal node... ')
@@ -35,5 +36,5 @@ def main(args=None):
     offboard_control.destroy_node()
     rclpy.shutdown()
 
-if __name__ == '__main__'
+if __name__ == '__main__':
     main()
