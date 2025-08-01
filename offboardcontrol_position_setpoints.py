@@ -1,7 +1,11 @@
+# OFFBOARDCONTROL_POSITION_SETPOINTS.py
+# This script is to enable offboard control upon execution and send some position set point to the simulator
+
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleLocalPosition, VehicleStatus, VehicleCommand
+import numpy as np
 
 class OffboardControl(Node):
     """ Creating node to control position of vehicle. """
@@ -46,6 +50,7 @@ class OffboardControl(Node):
         self.vehicle_local_position = VehicleLocalPosition()
         self.vehicle_status = VehicleStatus()
         self.offboard_setpoint_counter = 0
+        self.max_height = -100
 
     # Heartbeat signal publisher
     def publish_heartbeat(self):
@@ -103,18 +108,35 @@ class OffboardControl(Node):
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.vehicle_command_publisher.publish(msg)
 
+    def publish_position_setpoint(self, x: float, y: float, z: float):
+        """Publish the trajectory setpoint."""
+        msg = TrajectorySetpoint()
+        msg.position = [x, y, z]
+        msg.yaw = 1.57079  # (90 degree)
+        msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+        self.trajectory_setpoint_publisher.publish(msg)
+        self.get_logger().info(f"Publishing position setpoints {[x, y, z]}")
+
+
+
     # Timer logic, try arming and disarming aircraft at some set time
     def timer_callback(self):
         
         self.publish_heartbeat()
 
+        # Wait 10 clicks to engage offboard mode
         if self.offboard_setpoint_counter == 10:
             self.engage_offboard_mode()
-            self.arm()
-
         if self.offboard_setpoint_counter < 11:
             self.offboard_setpoint_counter += 1
 
+        if self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
+            if self.vehicle_local_position.z != self.max_height:
+                self.publish_position_setpoint(float(np.nan), float(np.nan),float(self.max_height))
+
+
+
+# My guess is that rclpy is used to begin this script before stopping itself once completed
 def main(args=None):
     print('Starting heartbeat signal node... ')
     rclpy.init(args = args)
@@ -122,6 +144,9 @@ def main(args=None):
     rclpy.spin(offboard_control)
     offboard_control.destroy_node()
     rclpy.shutdown()
+
+
+    
 
 if __name__ == '__main__':
     main()
