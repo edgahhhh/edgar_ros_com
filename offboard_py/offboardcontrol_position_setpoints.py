@@ -46,7 +46,7 @@ class OffboardControl(Node):
 
         self.get_logger().info('offboard_control_node started') 
 
-        # Initialize variables for logic
+        # Initialize variables
         self.vehicle_local_position = VehicleLocalPosition()
         self.vehicle_status = VehicleStatus()
         self.offboard_setpoint_counter = 0
@@ -71,24 +71,7 @@ class OffboardControl(Node):
     def vehicle_status_callback(self, vehicle_status):
         self.vehicle_status = vehicle_status
 
-    def engage_offboard_mode(self):
-        """Switch to offboard mode."""
-        self.publish_vehicle_command(
-            VehicleCommand.VEHICLE_CMD_DO_SET_MODE, param1=1.0, param2=6.0)
-        self.get_logger().info("Switching to offboard mode")
-
-    def arm(self):
-        """Send an arm command to the vehicle."""
-        self.publish_vehicle_command(
-            VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, param1=1.0)
-        self.get_logger().info('Arm command sent')
-
-    def disarm(self):
-        """Send a disarm command to the vehicle."""
-        self.publish_vehicle_command(
-            VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, param1=0.0)
-        self.get_logger().info('Disarm command sent')
-
+    # Publish vehicle command
     def publish_vehicle_command(self, command, **params) -> None:
         """Publish a vehicle command."""
         msg = VehicleCommand()
@@ -108,6 +91,13 @@ class OffboardControl(Node):
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.vehicle_command_publisher.publish(msg)
 
+    # Offboard mode engage
+    def engage_offboard_mode(self):
+        """Switch to offboard mode."""
+        self.publish_vehicle_command(
+            VehicleCommand.VEHICLE_CMD_DO_SET_MODE, param1=1.0, param2=6.0)
+        self.get_logger().info("Switching to offboard mode")
+
     def publish_position_setpoint(self, x: float, y: float, z: float):
         """Publish the trajectory setpoint."""
         msg = TrajectorySetpoint()
@@ -119,12 +109,19 @@ class OffboardControl(Node):
 
 
 
-    # Timer logic, try arming and disarming aircraft at some set time
     def timer_callback(self):
-        
+        """
+        Main loop and timer callback for script
+
+        First, a heartbeat is always sent to the autopilot for proof of life.
+        Next, after 10 clicks the autopilot will switch into offboard control mode.
+
+        Once in offboard control, the vehicle will reach to some set altitude, then start telling itself to go to
+        some randomly generated waypoint, once waypoint is reached the next one is generated and so on.
+
+        """
         self.publish_heartbeat()
 
-        # Wait 10 clicks to engage offboard mode
         if self.offboard_setpoint_counter == 10:
             self.engage_offboard_mode()
         if self.offboard_setpoint_counter < 11:
