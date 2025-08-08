@@ -1,4 +1,5 @@
 # OFFBOARDCONTROL_POSITION_SETPOINTS.py
+
 import rclpy        # RCLPY wiki is your bible here
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
@@ -131,10 +132,13 @@ class OffboardControl(Node):
         
         """
         msg = VehicleAttitudeSetpoint()
-        msg.roll_body
-        msg.pitch_body
-        msg.yaw_body
+        msg.roll_body = p_body
+        msg.pitch_body = q_body
+        msg.yaw_body = r_body
         msg.yaw_sp_move_rate = 1    # rad/s (only in use if commanding the yaw body)
+        # Not issuing thrust or inragral commands just yet
+        self.vehicle_attitude_setpoint_publisher.publish(msg)
+        self.get_logger().info(f"Publishing rates {[p_body, q_body, r_body]}")
 
     def resettable_counter(self):
         """Resettable counter for discrete logic"""

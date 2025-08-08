@@ -53,7 +53,7 @@ class OffboardControl(Node):
         self.timer_reset_sec = 60   # Time to generate a new heading
         self.counter_reset_discrete = self.timer_reset_sec / (0.1) + 1  # Using actual timer value might lead to division by really small number
         self.counter = 0
-        self.flat_dist_m = 2    # distance for heading set point in m
+        self.flat_dist_m = 1000  # distance for heading set point in m
         self.x_position = np.nan
         self.y_position = np.nan
 
@@ -163,30 +163,33 @@ class OffboardControl(Node):
             Even more later on try this instead:
             
             """
+            # Telling plane to go to x and y point neglecting altitude
+            self.publish_position_setpoint( 
+                float(self.x_position),                     # x position, defined by heading
+                float(self.y_position),                     # y position, defines by heading
+                float(np.nan))                              # z position, climb a little higher
 
 
-
-
-
-            # Position command, maybe set the z position as some constant and modify the constant here
-            if self.vehicle_local_position.z > -80:
-                # Climb command
-                self.publish_position_setpoint( 
-                    float(self.x_position),                     # x position, defined by heading
-                    float(self.y_position),                     # y position, defines by heading
-                    float(self.vehicle_local_position.z - 5))   # z position, climb a little higher
-            elif self.vehicle_local_position.z < -100:
-                # Descend command
-                self.publish_position_setpoint( 
-                    float(self.x_position),                     # x position, defined by heading
-                    float(self.y_position),                     # y position, defines by heading
-                    float(self.vehicle_local_position.z + 5))   # z position, controlled
-            else:
-                # Hold altitude at -90
-                self.publish_position_setpoint( 
-                    float(self.x_position),                     # x position, defined by heading
-                    float(self.y_position),                     # y position, defines by heading
-                    float(-90))                                 # z position, controlled
+            
+            # # Position command, maybe set the z position as some constant and modify the constant here
+            # if self.vehicle_local_position.z > -80:
+            #     # Climb command
+            #     self.publish_position_setpoint( 
+            #         float(self.x_position),                     # x position, defined by heading
+            #         float(self.y_position),                     # y position, defines by heading
+            #         float(self.vehicle_local_position.z - 5))   # z position, climb a little higher
+            # elif self.vehicle_local_position.z < -100:
+            #     # Descend command
+            #     self.publish_position_setpoint( 
+            #         float(self.x_position),                     # x position, defined by heading
+            #         float(self.y_position),                     # y position, defines by heading
+            #         float(self.vehicle_local_position.z + 5))   # z position, controlled
+            # else:
+            #     # Hold altitude at -90
+            #     self.publish_position_setpoint( 
+            #         float(self.x_position),                     # x position, defined by heading
+            #         float(self.y_position),                     # y position, defines by heading
+            #         float(-90))                                 # z position, controlled
 
 
             # Generating a random heading for the plane to go to every time the timer resets
