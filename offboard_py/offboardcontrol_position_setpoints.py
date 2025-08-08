@@ -119,14 +119,14 @@ class OffboardControl(Node):
             self.counter += 1
         # Reset if at or above the reset threshold
         elif self.counter >= self.counter_reset_discrete and self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
-            self.counter == 1
+            self.counter = 1
 
 
     def timer_callback(self):   # This runs every time period defined by the timer
         """
         Main loop and timer callback for script
 
-        First, a heartbeat is always sent to the autopilot for proof of life.
+        First, a heartbeat is always sent to the autopilot for proof of life @ 10 Hz
         Next, after 10 clicks the autopilot will switch into offboard control mode.
 
         Once in offboard control, the vehicle will reach to some set altitude, then start telling itself to go to
@@ -143,9 +143,30 @@ class OffboardControl(Node):
             self.offboard_setpoint_counter += 1
 
 
-
-
         if self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
+            """ 
+            Command rates logic 
+            Try same logic as the position commands, where a random rate is generated.
+            This time let the discrete counter be shorter as to not have the vehicle go crazy
+            In actual use case there will be a seperate controller commanding rates so we could also model a controller as well
+
+            Try this:
+            1. Command some rates
+            2. After some time set rates to NAN
+            3. After some time start back at 1.
+
+            Next we can try this:
+            1. Command some position to chase and some random rate 
+            2. Keep commanding position but set rates to NAN
+            3. After some time start back at 1
+
+            Even more later on try this instead:
+            
+            """
+
+
+
+
 
             # Position command, maybe set the z position as some constant and modify the constant here
             if self.vehicle_local_position.z > -80:
