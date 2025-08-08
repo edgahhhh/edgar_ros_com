@@ -1,7 +1,7 @@
 # OFFBOARDCONTROL_POSITION_SETPOINTS.py
 # This script is to enable offboard control upon execution and send some position set point to the simulator
 
-import rclpy
+import rclpy        # RCLPY wiki is your bible here
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleLocalPosition, VehicleStatus, VehicleCommand
@@ -46,11 +46,13 @@ class OffboardControl(Node):
 
         self.get_logger().info('offboard_control_node started') 
 
-        # Initialize variables for logic
+        # Initialize variables
         self.vehicle_local_position = VehicleLocalPosition()
         self.vehicle_status = VehicleStatus()
         self.offboard_setpoint_counter = 0
-        self.max_height = -100
+        self.timer_reset_sec = 60   # Time to generate a new heading
+        self.counter_reset_discrete = self.timer_reset_sec / (0.1) + 1  # Using actual timer value might lead to division by really small number
+        self.counter = 0
 
     # Heartbeat signal publisher
     def publish_heartbeat(self):
@@ -71,24 +73,7 @@ class OffboardControl(Node):
     def vehicle_status_callback(self, vehicle_status):
         self.vehicle_status = vehicle_status
 
-    def engage_offboard_mode(self):
-        """Switch to offboard mode."""
-        self.publish_vehicle_command(
-            VehicleCommand.VEHICLE_CMD_DO_SET_MODE, param1=1.0, param2=6.0)
-        self.get_logger().info("Switching to offboard mode")
-
-    def arm(self):
-        """Send an arm command to the vehicle."""
-        self.publish_vehicle_command(
-            VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, param1=1.0)
-        self.get_logger().info('Arm command sent')
-
-    def disarm(self):
-        """Send a disarm command to the vehicle."""
-        self.publish_vehicle_command(
-            VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, param1=0.0)
-        self.get_logger().info('Disarm command sent')
-
+    # Publish vehicle command
     def publish_vehicle_command(self, command, **params) -> None:
         """Publish a vehicle command."""
         msg = VehicleCommand()
@@ -108,6 +93,13 @@ class OffboardControl(Node):
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.vehicle_command_publisher.publish(msg)
 
+    # Offboard mode engage
+    def engage_offboard_mode(self):
+        """Switch to offboard mode."""
+        self.publish_vehicle_command(
+            VehicleCommand.VEHICLE_CMD_DO_SET_MODE, param1=1.0, param2=6.0)
+        self.get_logger().info("Switching to offboard mode")
+
     def publish_position_setpoint(self, x: float, y: float, z: float):
         """Publish the trajectory setpoint."""
         msg = TrajectorySetpoint()
@@ -117,22 +109,73 @@ class OffboardControl(Node):
         self.trajectory_setpoint_publisher.publish(msg)
         self.get_logger().info(f"Publishing position setpoints {[x, y, z]}")
 
+    # White trash a discrete counter because I'm still learning python
+    def resettable_counter(self):
+        # Count up if below reset threshold
+        if  self.counter < self.counter_reset_discrete and self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
+            self.counter += 1
+        # Reset if at or above the reset threshold
+        elif self.counter >= self.counter_reset_discrete and self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
+            self.counter == 1
 
 
-    # Timer logic, try arming and disarming aircraft at some set time
-    def timer_callback(self):
-        
+    def timer_callback(self):   # This runs every time period defined by the timer
+        """
+        Main loop and timer callback for script
+
+        First, a heartbeat is always sent to the autopilot for proof of life.
+        Next, after 10 clicks the autopilot will switch into offboard control mode.
+
+        Once in offboard control, the vehicle will reach to some set altitude, then start telling itself to go to
+        some randomly generated waypoint, once waypoint is reached the next one is generated and so on.
+
+        NED coordinate system
+        """
         self.publish_heartbeat()
+        self.resettable_counter()   # Call the counter for every time this loop is called
 
-        # Wait 10 clicks to engage offboard mode
         if self.offboard_setpoint_counter == 10:
             self.engage_offboard_mode()
         if self.offboard_setpoint_counter < 11:
             self.offboard_setpoint_counter += 1
 
+
+
+
         if self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
-            if self.vehicle_local_position.z != self.max_height:
-                self.publish_position_setpoint(float(np.nan), float(np.nan),float(self.max_height))
+
+            # Altitude command
+            # Go to some altitude
+            if self.vehicle_local_position.z > -80:
+                # Climb command
+                self.publish_position_setpoint( 
+                    float(np.nan),                              # x position, not controlled
+                    float(np.nan),                              # y position, not controlled
+                    float(self.vehicle_local_position.z - 5))   # z position, climb a little higher
+            elif self.vehicle_local_position.z < -100:
+                # Descend command
+                self.publish_position_setpoint( 
+                    float(np.nan),                              # x position, not controlled
+                    float(np.nan),                              # y position, not controlled
+                    float(self.vehicle_local_position.z + 5))   # z position, controlled
+            else:
+                # Hold altitude at -90
+                self.publish_position_setpoint( 
+                    float(np.nan),                              # x position, not controlled
+                    float(np.nan),                              # y position, not controlled
+                    float(-90))                                 # z position, controlled
+
+
+            # Generating a random heading for the plane to go to every time the timer resets
+            # Start at 1 because the counter will be 0 the first time we get here
+            if self.counter == 1:
+                self.heading = np.random.randint(0, 2) * np.pi
+            
+
+
+
+
+
 
 
 
