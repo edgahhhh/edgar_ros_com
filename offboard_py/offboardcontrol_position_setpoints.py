@@ -195,17 +195,11 @@ class OffboardControl(Node):
             # Generating a random heading for the plane to go to every time the timer resets
             # Start at 1 because the counter will be 0 the first time we get here
             # Generate some heading angle and command the vehicle to approach the x, y position in that direction
-            # In this case heading pi/2 rad is north
+            # In this case heading 0 is North and goes counter clockwise
             if self.counter == 1:
                 self.heading = np.random.randint(0, 2) * np.pi
                 self.x_position = self.vehicle_local_position.x - self.flat_dist_m * np.cos(self.heading)
                 self.y_position = self.vehicle_local_position.y - self.flat_dist_m * np.sin(self.heading)
-                # First try setting the position as a setpoint that only refreshes once and doesn't update
-                # i.e. the plane should hold position here
-                # Next, we can update the position so the plane keeps chasing it, which means we update 
-                # self.x_position and self.y_position everytime timer_callback() is called,
-                # Instead of everytime self.counter == 1.
-            
 
 
 
