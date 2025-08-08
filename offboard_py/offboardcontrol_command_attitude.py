@@ -1,9 +1,8 @@
-# OFFBOARDCONTROL_COMMAND_RATES.py
-
+# OFFBOARDCONTROL_POSITION_SETPOINTS.py
 import rclpy        # RCLPY wiki is your bible here
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
-from px4_msgs.msg import OffboardControlMode, VehicleRatesSetpoint, VehicleLocalPosition, VehicleStatus, VehicleCommand
+from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleLocalPosition, VehicleAttitude, VehicleAttitudeSetpoint, VehicleStatus, VehicleCommand
 import numpy as np
 
 class OffboardControl(Node):
@@ -24,13 +23,20 @@ class OffboardControl(Node):
         self.offboard_control_mode_publisher = self.create_publisher(
             OffboardControlMode, '/fmu/in/offboard_control_mode', qos_profile
             )
-        self.vehicle_rates_setpoint_publisher = self.create_publisher(
-            VehicleRatesSetpoint, '/fmu/in/vehicle_rates_setpoint', qos_profile
+        self.trajectory_setpoint_publisher = self.create_publisher(
+            TrajectorySetpoint, '/fmu/in/trajectory_setpoint', qos_profile
             )
+        self.vehicle_attitude_setpoint_publisher = self.create_publisher(
+            VehicleAttitudeSetpoint, '/fmu/in/vehicle_attitude_setpoint', qos_profile
+        )
         self.vehicle_command_publisher = self.create_publisher(
             VehicleCommand, '/fmu/in/vehicle_command', qos_profile
         )
         # Create subscribers for node
+        # These are for echoing from ros2 interface?
+        self.vehicle_attitude_subscriber = self.create_subscription(
+            VehicleAttitude, '/fmu/out/vehicle_attitude', self.vehicle_attitude_callback, qos_profile
+        )
         self.vehicle_local_position_subscriber = self.create_subscription(
             VehicleLocalPosition, '/fmu/out/vehicle_local_position', self.vehicle_local_position_callback, qos_profile
         )
@@ -66,6 +72,10 @@ class OffboardControl(Node):
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.offboard_control_mode_publisher.publish(msg)
 
+    # Attitude callback
+    def vehicle_attitude_callback(self, vehicle_attitude):
+        self.vehicle_attitude = vehicle_attitude
+
     # Position callback
     def vehicle_local_position_callback(self, vehicle_local_position):
         self.vehicle_local_position = vehicle_local_position
@@ -74,7 +84,13 @@ class OffboardControl(Node):
     def vehicle_status_callback(self, vehicle_status):
         self.vehicle_status = vehicle_status
 
-    # Publish vehicle command
+    def engage_offboard_mode(self):
+        """Switch to offboard mode."""
+        self.publish_vehicle_command(
+            VehicleCommand.VEHICLE_CMD_DO_SET_MODE, param1=1.0, param2=6.0)
+        self.get_logger().info("Switching to offboard mode")
+        # If issues start with the attitude controller, reset the integral when starting offboard mode.
+
     def publish_vehicle_command(self, command, **params) -> None:
         """Publish a vehicle command."""
         msg = VehicleCommand()
@@ -94,44 +110,34 @@ class OffboardControl(Node):
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.vehicle_command_publisher.publish(msg)
 
-    # Offboard mode engage
-    def engage_offboard_mode(self):
-        """Switch to offboard mode."""
-        self.publish_vehicle_command(
-            VehicleCommand.VEHICLE_CMD_DO_SET_MODE, param1=1.0, param2=6.0)
-        self.get_logger().info("Switching to offboard mode")
-
-    def publish_vehicle_rates_setpoint(self, p: float, q: float, r: float):
-        """
-        Publish vehicle rates setpoint
-        ------
-        p : roll rate (rad/s)
-        q : pitch rate (rad/s)
-        r : yaw rate (rad/s)
-        """
-        msg = VehicleRatesSetpoint()
-        msg.roll = p
-        msg.pitch = q
-        msg.yaw = r
-        msg.thrust_body
+    def publish_position_setpoint(self, x: float, y: float, z: float):
+        """Publish the trajectory setpoint."""
+        msg = TrajectorySetpoint()
+        msg.position = [x, y, z]
+        msg.yaw = 1.57079  # 0 yaw angle
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-        self.vehicle_rates_setpoint_publisher.publish(msg)
-        self.get_logger().info(f"Publishing rate setpoints {[p, q, r]}")
+        self.trajectory_setpoint_publisher.publish(msg)
+        self.get_logger().info(f"Publishing position setpoints {[x, y, z]}")
 
+    def publish_attitude_setpoint(self, p_body: float, q_body: float, r_body: float):
+        """
+        Publish attitude setpoint
+        --------------------------
+        p_body : desired roll angle (rad)
+        q_body : desired pitch angle (rad)
+        r_body : desired yaw angle
+        ---------------------------
+        Angles are derived from the NED coordinate system, refer to : https://docs.px4.io/main/en/config/flight_controller_orientation.html
+        
+        """
+        msg = VehicleAttitudeSetpoint()
+        msg.roll_body
+        msg.pitch_body
+        msg.yaw_body
+        msg.yaw_sp_move_rate = 1    # rad/s (only in use if commanding the yaw body)
 
-
-    # Note sure if im going to need this or not for this use case...
-    # def publish_position_setpoint(self, x: float, y: float, z: float):
-    #     """Publish the trajectory setpoint."""
-    #     msg = TrajectorySetpoint()
-    #     msg.position = [x, y, z]
-    #     msg.yaw = 1.57079  # 0 yaw angle
-    #     msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-    #     self.trajectory_setpoint_publisher.publish(msg)
-    #     self.get_logger().info(f"Publishing position setpoints {[x, y, z]}")
-
-    # White trash a discrete counter because I'm still learning python
     def resettable_counter(self):
+        """Resettable counter for discrete logic"""
         # Count up if below reset threshold
         if  self.counter < self.counter_reset_discrete and self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             self.counter += 1
@@ -144,7 +150,7 @@ class OffboardControl(Node):
         """
         Main loop and timer callback for script
 
-        First, a heartbeat is always sent to the autopilot for proof of life.
+        First, a heartbeat is always sent to the autopilot for proof of life @ 10 Hz
         Next, after 10 clicks the autopilot will switch into offboard control mode.
 
         Once in offboard control, the vehicle will reach to some set altitude, then start telling itself to go to
@@ -161,9 +167,28 @@ class OffboardControl(Node):
             self.offboard_setpoint_counter += 1
 
 
-
-
         if self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
+            """ 
+            Command rates logic 
+            Try same logic as the position commands, where a random rate is generated.
+            This time let the discrete counter be shorter as to not have the vehicle go crazy
+            In actual use case there will be a separate controller commanding rates so we could also model a controller as well
+
+            Try this:
+            1. Command some rates
+            2. After some time set rates to NAN
+            3. After some time start back at 1.
+
+            Next we can try this:
+            1. Command some position to chase and some random rate 
+            2. Keep commanding position but set rates to NAN
+            3. After some time start back at 1
+
+            """
+
+
+
+
 
             # Position command, maybe set the z position as some constant and modify the constant here
             if self.vehicle_local_position.z > -80:
