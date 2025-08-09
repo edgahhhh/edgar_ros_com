@@ -51,11 +51,12 @@ class OffboardControl(Node):
         self.vehicle_status = VehicleStatus()
         self.offboard_setpoint_counter = 0
         self.timer_reset_sec = 60   # Time to generate a new heading
-        self.counter_reset_discrete = self.timer_reset_sec / (0.1) + 1  # Using actual timer value might lead to division by really small number
+        self.counter_reset_discrete = self.timer_reset_sec / (self.timer.timer_period_ns/1000000000) + 1 
         self.counter = 0
-        self.flat_dist_m = 1000  # distance for heading set point in m
-        self.x_position = np.nan
-        self.y_position = np.nan
+        self.chase_dist_m = 25 # distance for heading set point in m
+        self.x_position = 0
+        self.y_position = 0
+        self.z_position = 0
 
     # Heartbeat signal publisher
     def publish_heartbeat(self):
@@ -63,8 +64,8 @@ class OffboardControl(Node):
         msg.position = True
         msg.velocity = False
         msg.acceleration = False
-        msg.attitude = False
-        msg.body_rate = False
+        msg.attitude = True
+        msg.body_rate = True
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.offboard_control_mode_publisher.publish(msg)
 
@@ -107,7 +108,7 @@ class OffboardControl(Node):
         """Publish the trajectory setpoint."""
         msg = TrajectorySetpoint()
         msg.position = [x, y, z]
-        msg.yaw = 1.57079  # 0 yaw angle
+        msg.yaw = float(np.nan)  # 90 degree yaw
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.trajectory_setpoint_publisher.publish(msg)
         self.get_logger().info(f"Publishing position setpoints {[x, y, z]}")
@@ -134,11 +135,15 @@ class OffboardControl(Node):
 
         NED coordinate system
         """
-        self.publish_heartbeat()
-        self.resettable_counter()   # Call the counter for every time this loop is called
+        self.publish_heartbeat()    # Send heartbeat signal as proof of life
+        self.resettable_counter()   # Call discrete counter for use in logic
 
         if self.offboard_setpoint_counter == 10:
             self.engage_offboard_mode()
+                # Generate y and z position to hold
+            self.y_position = self.vehicle_local_position.y
+            self.z_position = self.vehicle_local_position.z
+
         if self.offboard_setpoint_counter < 11:
             self.offboard_setpoint_counter += 1
 
@@ -163,14 +168,16 @@ class OffboardControl(Node):
             Even more later on try this instead:
             
             """
-            # Telling plane to go to x and y point neglecting altitude
+
+            # Telling plane to hold some z and y, and chase some x
+            self.x_position = self.vehicle_local_position.x + self.chase_dist_m
+
             self.publish_position_setpoint( 
-                float(self.x_position),                     # x position, defined by heading
-                float(self.y_position),                     # y position, defines by heading
-                float(np.nan))                              # z position, climb a little higher
+                float(self.x_position),                     # x position, chase
+                float(self.y_position),                     # y position, hold
+                float(self.z_position))                     # z position, hold
 
-
-            
+            # This altitude command kind of worked but plane climbed slow, probably due to circling
             # # Position command, maybe set the z position as some constant and modify the constant here
             # if self.vehicle_local_position.z > -80:
             #     # Climb command
@@ -196,10 +203,10 @@ class OffboardControl(Node):
             # Start at 1 because the counter will be 0 the first time we get here
             # Generate some heading angle and command the vehicle to approach the x, y position in that direction
             # In this case heading 0 is North and goes counter clockwise
-            if self.counter == 1:
-                self.heading = np.random.randint(0, 2) * np.pi
-                self.x_position = self.vehicle_local_position.x - self.flat_dist_m * np.cos(self.heading)
-                self.y_position = self.vehicle_local_position.y - self.flat_dist_m * np.sin(self.heading)
+            # if self.counter == 1:
+            #     self.heading = np.random.randint(0, 2) * np.pi
+            #     self.x_position = self.vehicle_local_position.x - self.flat_dist_m * np.cos(self.heading)
+            #     self.y_position = self.vehicle_local_position.y - self.flat_dist_m * np.sin(self.heading)
 
 
 
