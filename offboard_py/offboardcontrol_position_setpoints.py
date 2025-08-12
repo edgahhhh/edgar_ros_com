@@ -64,8 +64,8 @@ class OffboardControl(Node):
         msg.position = True
         msg.velocity = False
         msg.acceleration = False
-        msg.attitude = True
-        msg.body_rate = True
+        msg.attitude = False
+        msg.body_rate = False
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.offboard_control_mode_publisher.publish(msg)
 
