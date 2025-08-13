@@ -64,8 +64,8 @@ class OffboardControl(Node):
         msg.position = True
         msg.velocity = False
         msg.acceleration = False
-        msg.attitude = True
-        msg.body_rate = True
+        msg.attitude = False
+        msg.body_rate = False
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.offboard_control_mode_publisher.publish(msg)
 
@@ -108,7 +108,7 @@ class OffboardControl(Node):
         """Publish the trajectory setpoint."""
         msg = TrajectorySetpoint()
         msg.position = [x, y, z]
-        msg.yaw = float(np.nan)  # 90 degree yaw
+        msg.yaw = float(0)  # 90 degree yaw
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.trajectory_setpoint_publisher.publish(msg)
         self.get_logger().info(f"Publishing position setpoints {[x, y, z]}")
@@ -173,8 +173,8 @@ class OffboardControl(Node):
             self.x_position = self.vehicle_local_position.x + self.chase_dist_m
 
             self.publish_position_setpoint( 
-                float(self.x_position),                     # x position, chase
-                float(self.y_position),                     # y position, hold
+                float(0),                     # x position, chase
+                float(0),                     # y position, hold
                 float(self.z_position))                     # z position, hold
 
             # This altitude command kind of worked but plane climbed slow, probably due to circling
