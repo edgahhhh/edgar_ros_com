@@ -48,21 +48,31 @@ class OffboardControl(Node):
         self.vehicle_local_position = VehicleLocalPosition()
         self.vehicle_status = VehicleStatus()
         self.offboard_setpoint_counter = 0
-        self.timer_reset_sec = 60   # Time to generate a new heading
-        self.counter_reset_discrete = self.timer_reset_sec / (0.1) + 1  # Using actual timer value might lead to division by really small number
+
         self.counter = 0
         self.flat_dist_m = 2    # distance for heading set point in m
         self.x_position = np.nan
         self.y_position = np.nan
 
+        self.rates_logic = 1            # 1 = rates only, 2 = rates and position
+        self.rates_to_control = 1       # 1 = p and q only,   2 = r only
+        self.timer_reset_sec = 8       # Interval for rates logic, integer
+        self.counter_reset_discrete = self.timer_reset_sec / (0.1) + 1
+        if self.rates_to_control == 1:
+            self.p_body = 0.1           # roll rate (rad/s)
+            self.q_body = 0.25           # pitch rate
+            self.r_body = 0.0           # yaw rate, not controlled?
+
+
+
     # Heartbeat signal publisher
     def publish_heartbeat(self):
         msg = OffboardControlMode()
-        msg.position = True
+        msg.position = False
         msg.velocity = False
         msg.acceleration = False
         msg.attitude = False
-        msg.body_rate = False
+        msg.body_rate = True
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.offboard_control_mode_publisher.publish(msg)
 
@@ -101,24 +111,23 @@ class OffboardControl(Node):
             VehicleCommand.VEHICLE_CMD_DO_SET_MODE, param1=1.0, param2=6.0)
         self.get_logger().info("Switching to offboard mode")
 
-    def publish_vehicle_rates_setpoint(self, p: float, q: float, r: float):
+    def publish_vehicle_rates_setpoint(self, p: float, q: float, r: float, T: float):
         """
         Publish vehicle rates setpoint
         ------
         p : roll rate (rad/s)
         q : pitch rate (rad/s)
         r : yaw rate (rad/s)
+        T : normlaized throttle command [-1, 1]
         """
         msg = VehicleRatesSetpoint()
-        msg.roll = p
+        msg.roll = p 
         msg.pitch = q
         msg.yaw = r
-        msg.thrust_body
+        msg.thrust_body = [T, float(0), float(0)]
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.vehicle_rates_setpoint_publisher.publish(msg)
-        self.get_logger().info(f"Publishing rate setpoints {[p, q, r]}")
-
-
+        self.get_logger().info(f"Publishing rate setpoints {[p, q, r]}. Publishing throttle {T}")
 
     # Note sure if im going to need this or not for this use case...
     # def publish_position_setpoint(self, x: float, y: float, z: float):
@@ -130,7 +139,6 @@ class OffboardControl(Node):
     #     self.trajectory_setpoint_publisher.publish(msg)
     #     self.get_logger().info(f"Publishing position setpoints {[x, y, z]}")
 
-    # White trash a discrete counter because I'm still learning python
     def resettable_counter(self):
         # Count up if below reset threshold
         if  self.counter < self.counter_reset_discrete and self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
@@ -154,52 +162,61 @@ class OffboardControl(Node):
         """
         self.publish_heartbeat()
         self.resettable_counter()   # Call the counter for every time this loop is called
-
         if self.offboard_setpoint_counter == 10:
             self.engage_offboard_mode()
+            # print(self.vehicle_status.nav_state)
+            # print(VehicleStatus.NAVIGATION_STATE_OFFBOARD)
         if self.offboard_setpoint_counter < 11:
             self.offboard_setpoint_counter += 1
 
 
 
-
         if self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
+            """ 
+            Command rates logic 
+            Try same logic as the position commands, where a random rate is generated.
+            This time let the discrete counter be shorter as to not have the vehicle go crazy
+            In actual use case there will be a separate controller commanding rates so we could also model a controller as well
 
-            # Position command, maybe set the z position as some constant and modify the constant here
-            if self.vehicle_local_position.z > -80:
-                # Climb command
-                self.publish_position_setpoint( 
-                    float(self.x_position),                     # x position, defined by heading
-                    float(self.y_position),                     # y position, defines by heading
-                    float(self.vehicle_local_position.z - 5))   # z position, climb a little higher
-            elif self.vehicle_local_position.z < -100:
-                # Descend command
-                self.publish_position_setpoint( 
-                    float(self.x_position),                     # x position, defined by heading
-                    float(self.y_position),                     # y position, defines by heading
-                    float(self.vehicle_local_position.z + 5))   # z position, controlled
-            else:
-                # Hold altitude at -90
-                self.publish_position_setpoint( 
-                    float(self.x_position),                     # x position, defined by heading
-                    float(self.y_position),                     # y position, defines by heading
-                    float(-90))                                 # z position, controlled
+            Try this:
+            1. Command some rates
+            2. After some time set rates to NAN
+            3. After some time start back at 1.
 
+            Next we can try this:
+            1. Command some position to chase and some random rate 
+            2. Keep commanding position but set rates to NAN
+            3. After some time start back at 1
 
-            # Generating a random heading for the plane to go to every time the timer resets
-            # Start at 1 because the counter will be 0 the first time we get here
-            # Generate some heading angle and command the vehicle to approach the x, y position in that direction
-            # In this case heading pi/2 rad is north
-            if self.counter == 1:
-                self.heading = np.random.randint(0, 2) * np.pi
-                self.x_position = self.vehicle_local_position.x - self.flat_dist_m * np.cos(self.heading)
-                self.y_position = self.vehicle_local_position.y - self.flat_dist_m * np.sin(self.heading)
-                # First try setting the position as a setpoint that only refreshes once and doesn't update
-                # i.e. the plane should hold position here
-                # Next, we can update the position so the plane keeps chasing it, which means we update 
-                # self.x_position and self.y_position everytime timer_callback() is called,
-                # Instead of everytime self.counter == 1.
-            
+            """
+
+            # Option 1, rates only
+            if self.rates_logic == 1:
+                """
+                The logic here is to have some discrete interval, 
+                where half of it the rate is controlled and the other half the rates aren't controlled
+                """
+                self.interval_on = 0.5 * self.counter_reset_discrete + 1
+                self.interval_off = self.counter_reset_discrete + 1 - self.interval_on
+                # print(self.counter)
+                if self.counter <= self.interval_on:
+                    self.publish_vehicle_rates_setpoint(
+                        float( self.p_body) ,       # roll rate
+                        float( self.q_body ),       # pitch rate
+                        float( self.r_body ),       # yaw rate
+                        float(0.5)                         # 50 % throttle
+                    )
+                else:
+                    self.publish_vehicle_rates_setpoint(
+                        float(-self.p_body),
+                        float(0),
+                        float(-self.r_body),
+                        float(0.5)
+                    )
+            # # Option 2
+            # elif self.rates_logic == 2:
+            #     print()
+
 
 
 
