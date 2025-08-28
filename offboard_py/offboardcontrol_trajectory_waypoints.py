@@ -50,8 +50,8 @@ class OffboardControl(Node):
         self.timer_reset_sec = 60   # Time to generate a new heading
         self.counter_reset_discrete = self.timer_reset_sec / (self.timer.timer_period_ns/1000000000) + 1 
         self.counter = 0
-        self.waypoint_distance_x= 100   # distance for x waypoint in m
-        self.waypoint_distance_y = 100  # distance for y waypoint in m
+        self.waypoint_distance_x= 1000   # distance for x waypoint in m
+        self.waypoint_distance_y = 1000  # distance for y waypoint in m
         self.x_position_waypoint = 0
         self.y_position_waypoint = 0
         self.z_position_waypoint = 0
@@ -96,7 +96,6 @@ class OffboardControl(Node):
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.vehicle_command_publisher.publish(msg)
 
-    # Offboard mode engage
     def engage_offboard_mode(self):
         """Switch to offboard mode."""
         self.publish_vehicle_command(
@@ -109,12 +108,11 @@ class OffboardControl(Node):
         msg.position = [x, y, z]
         msg.yaw = float(0)  # 90 degree yaw
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-        self.trajectory_setpoint_publisher.publish(msg)
-        self.get_logger().info(f"Publishing position setpoints {[x, y, z]}")
+        self.trajectory_waypoint_publisher.publish(msg)
+        self.get_logger().info(f"Publishing waypoints {[x, y, z]}")
 
-    # White trash a discrete counter that's good enough
     def resettable_counter(self):
-        # Count up if below reset threshold
+        """ Discrete Counter """
         if  self.counter < self.counter_reset_discrete and self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             self.counter += 1
         # Reset if at or above the reset threshold
@@ -142,33 +140,24 @@ class OffboardControl(Node):
         if self.offboard_setpoint_counter < 11:
             self.offboard_setpoint_counter += 1
 
-
         if self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             """
             Command vehicle waypoints using TrajectoryWaypoint message
             """
 
-            if self.waypoint_counter < 1:
+            if self.waypoint_counter == 0:
                 """ Publish waypoint only once"""
                 self.waypoint_counter += 1
                 self.x_position_waypoint = self.vehicle_local_position.x + self.waypoint_distance_x
                 self.y_position_waypoint = self.vehicle_local_position.y + self.waypoint_distance_y
                 self.z_position_waypoint = np.nan
             
-                self.publish_trajectory_waypoint( 
-                    float(self.x_position_waypoint),                     # x position, chase
-                    float(self.y_position_waypoint),                     # y position, hold
-                    float(self.z_position_waypoint))                     # z position, hold
+            self.publish_trajectory_waypoint( 
+                    float(self.x_position_waypoint),                     # x position, go to
+                    float(self.y_position_waypoint),                     # y position, go to 
+                    float(self.z_position_waypoint))                     # z position, don't control
 
 
-
-
-
-
-
-
-
-# My guess is that rclpy is used to begin this script before stopping itself once completed
 def main(args=None):
     print('Starting heartbeat signal node... ')
     rclpy.init(args = args)
@@ -177,9 +166,5 @@ def main(args=None):
     offboard_control.destroy_node()
     rclpy.shutdown()
 
-
-    
-
 if __name__ == '__main__':
     main()
-    
