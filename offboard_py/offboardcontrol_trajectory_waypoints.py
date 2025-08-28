@@ -50,10 +50,12 @@ class OffboardControl(Node):
         self.timer_reset_sec = 60   # Time to generate a new heading
         self.counter_reset_discrete = self.timer_reset_sec / (self.timer.timer_period_ns/1000000000) + 1 
         self.counter = 0
-        self.waypoint_distance_x= 100   # distance for heading set point in m
-        self.x_position = 0
-        self.y_position = 0
-        self.z_position = 0
+        self.waypoint_distance_x= 100   # distance for x waypoint in m
+        self.waypoint_distance_y = 100  # distance for y waypoint in m
+        self.x_position_waypoint = 0
+        self.y_position_waypoint = 0
+        self.z_position_waypoint = 0
+        self.waypoint_counter = 0
 
     # Heartbeat signal publisher
     def publish_heartbeat(self):
@@ -124,15 +126,12 @@ class OffboardControl(Node):
         Main loop and timer callback for script
 
         First, a heartbeat is always sent to the autopilot for proof of life @ 10 Hz
-        Next, after 10 clicks the autopilot will switch into offboard control mode.
+        Next, after 10 clicks (1 seconds) the autopilot will switch into offboard control mode.
 
-        Once in offboard control, the vehicle will reach to some set altitude, then start telling itself to go to
-        some randomly generated waypoint, once waypoint is reached the next one is generated and so on.
-
-        NED coordinate system
+        While in offboard mode, command vehicle to approach some waypoint in the N and E frame: (x,y)
         """
         self.publish_heartbeat()    # Send heartbeat signal as proof of life
-        self.resettable_counter()   # Call discrete counter for use in logic
+        # self.resettable_counter()   # Call discrete counter for use in logic
 
         if self.offboard_setpoint_counter == 10:
             self.engage_offboard_mode()
@@ -145,64 +144,22 @@ class OffboardControl(Node):
 
 
         if self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
-            """ 
-            Command rates logic 
-            Try same logic as the position commands, where a random rate is generated.
-            This time let the discrete counter be shorter as to not have the vehicle go crazy
-            In actual use case there will be a seperate controller commanding rates so we could also model a controller as well
-
-            Try this:
-            1. Command some rates
-            2. After some time set rates to NAN
-            3. After some time start back at 1.
-
-            Next we can try this:
-            1. Command some position to chase and some random rate 
-            2. Keep commanding position but set rates to NAN
-            3. After some time start back at 1
-
-            Even more later on try this instead:
-            
+            """
+            Command vehicle waypoints using TrajectoryWaypoint message
             """
 
-            # Telling plane to hold some z and y, and chase some x
-            self.x_position = self.vehicle_local_position.x + self.chase_dist_m
+            if self.waypoint_counter < 1:
+                """ Publish waypoint only once"""
+                self.waypoint_counter += 1
+                self.x_position_waypoint = self.vehicle_local_position.x + self.waypoint_distance_x
+                self.y_position_waypoint = self.vehicle_local_position.y + self.waypoint_distance_y
+                self.z_position_waypoint = np.nan
+            
+                self.publish_trajectory_waypoint( 
+                    float(self.x_position_waypoint),                     # x position, chase
+                    float(self.y_position_waypoint),                     # y position, hold
+                    float(self.z_position_waypoint))                     # z position, hold
 
-            self.publish_position_setpoint( 
-                float(0),                     # x position, chase
-                float(0),                     # y position, hold
-                float(self.z_position))                     # z position, hold
-
-            # This altitude command kind of worked but plane climbed slow, probably due to circling
-            # # Position command, maybe set the z position as some constant and modify the constant here
-            # if self.vehicle_local_position.z > -80:
-            #     # Climb command
-            #     self.publish_position_setpoint( 
-            #         float(self.x_position),                     # x position, defined by heading
-            #         float(self.y_position),                     # y position, defines by heading
-            #         float(self.vehicle_local_position.z - 5))   # z position, climb a little higher
-            # elif self.vehicle_local_position.z < -100:
-            #     # Descend command
-            #     self.publish_position_setpoint( 
-            #         float(self.x_position),                     # x position, defined by heading
-            #         float(self.y_position),                     # y position, defines by heading
-            #         float(self.vehicle_local_position.z + 5))   # z position, controlled
-            # else:
-            #     # Hold altitude at -90
-            #     self.publish_position_setpoint( 
-            #         float(self.x_position),                     # x position, defined by heading
-            #         float(self.y_position),                     # y position, defines by heading
-            #         float(-90))                                 # z position, controlled
-
-
-            # Generating a random heading for the plane to go to every time the timer resets
-            # Start at 1 because the counter will be 0 the first time we get here
-            # Generate some heading angle and command the vehicle to approach the x, y position in that direction
-            # In this case heading 0 is North and goes counter clockwise
-            # if self.counter == 1:
-            #     self.heading = np.random.randint(0, 2) * np.pi
-            #     self.x_position = self.vehicle_local_position.x - self.flat_dist_m * np.cos(self.heading)
-            #     self.y_position = self.vehicle_local_position.y - self.flat_dist_m * np.sin(self.heading)
 
 
 
