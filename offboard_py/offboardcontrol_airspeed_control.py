@@ -58,7 +58,8 @@ class OffboardControl(Node):
         msg.acceleration = False
         msg.attitude = False
         msg.body_rate = False
-        self.thrust_and_torque = True
+        msg.thrust_and_torque = True
+        msg.direct_actuator = False
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.offboard_control_mode_publisher.publish(msg)
 
@@ -107,8 +108,8 @@ class OffboardControl(Node):
         if self.offboard_setpoint_counter == 0:
             """ Initialize controller """
             self.pid_controller = PIDController(
-                Kp = 0.1, Ki = 0.001, Kd = 0, target_air_speed= 30, de_feedforward = 0, time_step = 1, offboard_time_step= 0.1)
-            
+                Kp = 0.1, Ki = 0.01, Kd = 0, target_air_speed = 18 , Fx_feedforward = 0, pid_time_step = 5, offboard_time_step= 0.1)
+             
         if self.offboard_setpoint_counter < 10:
             self.offboard_setpoint_counter += 1
 
@@ -119,7 +120,7 @@ class OffboardControl(Node):
         if self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             """ Publish thrust commands from controller to vehicle to try to achieve target speed """
             self.airspeed_true = self.airspeed_validated.true_airspeed_m_s
-            self.x_thrust_setpoint = self.pid_controller.compute(self)
+            self.x_thrust_setpoint = self.pid_controller.compute(float(self.airspeed_true))
             self.publish_thrust_command(float(self.x_thrust_setpoint))
 
 
@@ -148,7 +149,7 @@ class PIDController:
         self.discrete_time_step = self.time_step / offboard_time_step
         self.discrete_counter = 0
 
-    def saturate(self, value, min_value = 0 , max_value = 1):
+    def saturate(self, value, min_value = 0.33 , max_value = 0.66):
         """
         Saturate value to be between min and max values
         -------------------------------------------
@@ -162,7 +163,7 @@ class PIDController:
         value_saturated = max(min(value, max_value), min_value)
         return value_saturated
 
-    def compute(self, airspeed_true):
+    def compute(self, airspeed_true: float):
         """ 
         Compute error and compute command to plant 
         -------------------------------------------
@@ -176,22 +177,24 @@ class PIDController:
             self.discrete_counter += 1
             if self.discrete_counter == 1:
                 airspeed_error = self.target_air_speed - airspeed_true
+                print(airspeed_error)
                 p_gain = self.Kp * airspeed_error
                 i_gain = self.integral_error + (self.Ki * airspeed_error * self.time_step)
                 d_gain = self.Kd * (airspeed_error - self.previous_error) / self.time_step
                 self.previous_error = airspeed_error
                 Fx_feedback = p_gain + i_gain + d_gain
-                Fx = self.saturate(Fx_feedback - self.Fx_feedforward)
-                return Fx
+                self.Fx = self.saturate(Fx_feedback - self.Fx_feedforward)
         
         elif self.discrete_counter >= self.discrete_time_step:
             """ Reset discrete counter at end of time step """
             self.discrete_counter = 0
-            return None
         
         else:
             sys.exit("Error in discrete counter")
-            return None
+
+        return self.Fx
+
+
 
 
 def main(args=None):
