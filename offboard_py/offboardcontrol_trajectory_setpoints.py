@@ -8,8 +8,6 @@ from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleLocalPo
 import numpy as np
 
 class OffboardControl(Node):
-    """ Creating node to control position of vehicle. """
-
     def __init__(self):
         super().__init__('offboard_control_node')
 
@@ -208,14 +206,6 @@ class OffboardControl(Node):
             #     self.x_position = self.vehicle_local_position.x - self.flat_dist_m * np.cos(self.heading)
             #     self.y_position = self.vehicle_local_position.y - self.flat_dist_m * np.sin(self.heading)
 
-
-
-
-
-
-
-
-# My guess is that rclpy is used to begin this script before stopping itself once completed
 def main(args=None):
     print('Starting heartbeat signal node... ')
     rclpy.init(args = args)
@@ -223,9 +213,6 @@ def main(args=None):
     rclpy.spin(offboard_control)
     offboard_control.destroy_node()
     rclpy.shutdown()
-
-
-    
 
 if __name__ == '__main__':
     main()
