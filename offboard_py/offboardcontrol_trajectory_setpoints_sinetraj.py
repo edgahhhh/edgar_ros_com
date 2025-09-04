@@ -171,23 +171,21 @@ class OffboardControl(Node):
             self.x_tangent = self.dx
             self.y_tangent = 0
             self.z_tangent = self.omega*self.z_amp*np.cos(self.omega*self.traj_t)
-
+            self.z_tangent = 0
             # Debugging variables
-            # self.x_position = 100
-            # self.y_position = 800
-            # self.z_position = -120
-            # self.y_tangent = 0
-            # self.z_tangent = 0
+            self.x_position = 0
+            self.y_position = 0
+            self.z_position = -100
 
-            # if self.vehicle_local_position.x > self.x_position:
-            #     self.x_tangent = -1
-            # else:
-            #     self.x_tangent = 1
+            if self.vehicle_local_position.x > self.x_position:
+                self.x_tangent = -1
+            else:
+                self.x_tangent = 1
 
             # Setting speeds to NaN
-            self.x_tangent = np.nan
-            self.y_tangent = np.nan
-            self.z_tangent = np.nan
+            # self.x_tangent = np.nan
+            # self.y_tangent = np.nan
+            # self.z_tangent = np.nan
 
             self.publish_trajectory_setpoint(
                 x = float(self.x_position),
