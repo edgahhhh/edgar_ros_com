@@ -55,20 +55,25 @@ class OffboardControl(Node):
         self.traj_t = 0
         self.period = 50  # s
 
-        # z_trajectory as function of time
-        # Sine wave w/ amplitude of altitude change over some period
-        self.z_min = -50
-        self.z_amp = -10  # m
-        self.omega = 2 * np.pi / self.period 
-
         # x_trajectory as function of time
         # Linear change of target x
         self.x_min = 0
         self.x_target = -1000 # m
         self.dx = self.x_target / self.period   # m/s
+        self.x_tangent = 0
 
         # y trajectory
         self.y_position = 0
+        self.y_tangent = 0
+
+        # z_trajectory as function of time
+        # Sine wave w/ amplitude of altitude change over some period
+        self.z_min = -50
+        self.z_amp = -10  # m
+        self.omega = 2 * np.pi / self.period 
+        self.sine_calc = 0
+        self.z_tangent = 0
+
         # Counter for x position
         self.x_position_counter = 0
 
@@ -76,7 +81,7 @@ class OffboardControl(Node):
     def publish_heartbeat(self):
         msg = OffboardControlMode()
         msg.position = True
-        msg.velocity = True
+        msg.velocity = False
         msg.acceleration = False
         msg.attitude = False
         msg.body_rate = False
@@ -127,17 +132,10 @@ class OffboardControl(Node):
         msg.velocity[0] = vx
         msg.velocity[1] = vy
         msg.velocity[2] = vz
+        
+        # msg.yaw = float(0)
+        # msg.yawspeed = float(0)
 
-        # msg.acceleration[0] = float(0)
-        # msg.acceleration[1] = float(0)
-        # msg.acceleration[2] = float(0)
-
-        # msg.jerk[0] = float(0)
-        # msg.jerk[1] = float(0)
-        # msg.jerk[2] = float(0)
-
-        msg.yaw = float(0)
-        msg.yawspeed = float(0)
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.trajectory_setpoint_publisher.publish(msg)
         self.get_logger().info(f"Publishing position setpoints: {[x, y, z]} \nPublishing velocity setpoints {[vx, vy, vz]}")
@@ -162,30 +160,42 @@ class OffboardControl(Node):
             if self.x_position_counter < 1:
                 self.x_position_counter += 1
 
+            # -- SHM trajectory --
             self.traj_t = self.traj_t + self.timer_period
             self.sine_calc = np.sin(self.omega * self.traj_t)
 
-            self.x_position = self.x_min + self.dx*self.traj_t
+            # self.x_position = self.x_min + self.dx*self.traj_t
+            self.x_position = self.x_min + self.z_amp*self.sine_calc
             self.z_position = self.z_min + self.z_amp*self.sine_calc
 
-            self.x_speed = self.dx
-            self.y_speed = 0
-            self.z_speed = self.omega*self.z_amp*np.cos(self.omega*self.traj_t)
+            self.x_tangent = self.dx
+            self.y_tangent = 0
+            self.z_tangent = self.omega*self.z_amp*np.cos(self.omega*self.traj_t)
 
+            # Debugging variables
+            # self.x_position = 100
+            # self.y_position = 800
+            # self.z_position = -120
+            # self.y_tangent = 0
+            # self.z_tangent = 0
 
-            self.x_position = 0
-            self.z_position = -80
+            # if self.vehicle_local_position.x > self.x_position:
+            #     self.x_tangent = -1
+            # else:
+            #     self.x_tangent = 1
 
-            self.x_speed = 0
-            self.z_speed = 0
+            # Setting speeds to NaN
+            self.x_tangent = np.nan
+            self.y_tangent = np.nan
+            self.z_tangent = np.nan
 
             self.publish_trajectory_setpoint(
                 x = float(self.x_position),
                 y = float(self.y_position),
                 z = float(self.z_position),
-                vx = float(self.x_speed),
-                vy = float(self.y_speed),
-                vz = float(self.z_speed)
+                vx = float(self.x_tangent),
+                vy = float(self.y_tangent),
+                vz = float(self.z_tangent)
                 )
 
 
