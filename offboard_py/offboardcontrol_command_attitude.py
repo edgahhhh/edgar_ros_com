@@ -1,4 +1,4 @@
-# OFFBOARDCONTROL_POSITION_SETPOINTS.py
+# OFFBOARDCONTROL_COMMAND_ATTITUDE.py
 
 import rclpy        # RCLPY wiki is your bible here
 from rclpy.node import Node
