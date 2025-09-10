@@ -3,7 +3,7 @@ from rclpy.node import Node
 
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 
-from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleLocalPosition, VehicleStatus, VehicleCommand
+from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleStatus
 
 import numpy as np
 
@@ -26,19 +26,33 @@ class OffboardControl(Node):
             TrajectorySetpoint, '/fmu/in/trajectory_setpoint', qos_profile
             )
         """ Create subscribers """
-        self.vehicle_local_position_subscriber = self.create_subscription(
-            VehicleLocalPosition, '/fmu/out/vehicle_local_position', self.vehicle_local_position_callback, qos_profile
-        )
         self.vehicle_status_subscriber = self.create_subscription(
             VehicleStatus, '/fmu/out/vehicle_status', self.vehicle_status_callback, qos_profile
         )
         """ Initialize variables """
-        self.vehicle_local_position = VehicleLocalPosition()
         self.vehicle_status = VehicleStatus()
 
-        self.position_setpoint_x = 50
-        self.position_setpoint_y = 50
-        self.position_setpoint_z = -120
+        self.mode = 0   # 0=Z-plane sine, 1=X-plane sine, 2=X and Z-plane sine\\
+        
+        if self.mode == 0 or self.mode == 2:
+            # Sine wave trajectory in z plane
+            self.position_setpoint_x = np.nan
+            self.position_setpoint_y = np.nan
+
+            self.trajectory_t = 0   # initialize time
+            self.trajectory_period = 50    # s
+            self.z_min = -50    # m
+            self.z_amp = -15    # m
+            
+            self.velocity_setpoint_x = 10
+            self.velocity_setpoint_y = np.nan
+            self.velocity_setpoint_z = 0
+
+            self.omega = 2*np.pi/self.trajectory_period
+
+
+
+        self.dx = self.x_target / self.period   # m/s
 
         """ Create timer and logger """
         self.timer_period = 0.1
@@ -50,7 +64,7 @@ class OffboardControl(Node):
         """ offboard control mode message """
         msg = OffboardControlMode()
         msg.position = True
-        msg.velocity = False
+        msg.velocity = True
         msg.acceleration = False
         msg.attitude = False
         msg.body_rate = False
@@ -64,8 +78,8 @@ class OffboardControl(Node):
     def vehicle_status_callback(self, vehicle_status):
         self.vehicle_status = vehicle_status
 
-    def publish_trajectory_setpoint(self, x:float, y:float, z:float, vx:float=np.nan, vy:float=np.nan, vz:float=np.nan):
-        """Publish trajectory setpoint."""
+    def publish_trajectory_setpoint(self, x:float, y:float, z:float, vx:float, vy:float, vz:float):
+        """Publish the trajectory setpoint."""
         msg = TrajectorySetpoint()
         msg.position[0] = x
         msg.position[1] = y
@@ -77,20 +91,34 @@ class OffboardControl(Node):
 
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.trajectory_setpoint_publisher.publish(msg)
-        self.get_logger().info(f"Publishing position setpoints: {[x, y, z]}")
+        self.get_logger().info(f"Publishing positions: {[x, y, z]} \nPublishing velocities: {[vx, vy, vz]}")
 
     def timer_callback(self):
         """ Timer callback to publish heartbeat and trajectory commands """
         self.publish_heartbeat()
 
         if self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
-            """ Command vehicle to go to some xyz position """
-            self.publish_trajectory_setpoint(
-                x = float(self.position_setpoint_x),
-                y = float(self.position_setpoint_y),
-                z = float(self.position_setpoint_z)
-                )
-            
+            """ Command specified trajectory """
+            if self.mode == 0 or self.mode == 2:
+                """ Z Sine Wave """
+                self.position_setpoint_z = self.z_min + self.z_amp*np.sin(self.omega*self.trajectory_t)
+                self.velocity_setpoint_z = self.omega*self.z_amp*np.cos(self.omega*self.trajectory_t)
+
+            if self.mode == 1 or self.mode == 2:
+                """ X Sine Wave """
+                self.position_setpoint_x = self.x_min + self.x_amp*np.sin(self.omega*self.trajectory_t)
+                self.velocity_setpoint_x = self.omega*self.x_amp*np.cos(self.omega*self.trajectory_t)
+
+            self.trajectory_t = self.trajectory_t + self.timer_period
+
+            self.publish_trajectory_setpoint(float(self.position_setpoint_x),
+                                             float(self.position_setpoint_y),
+                                             float(self.position_setpoint_z), 
+                                             float(self.velocity_setpoint_x), 
+                                             float(self.velocity_setpoint_y), 
+                                             float(self.velocity_setpoint_z))
+
+
 def main(args=None):
     print('Starting offbaord control mode... ')
 

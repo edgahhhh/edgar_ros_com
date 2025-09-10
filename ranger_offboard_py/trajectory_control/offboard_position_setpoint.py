@@ -37,7 +37,7 @@ class OffboardControl(Node):
         self.vehicle_status = VehicleStatus()
 
         self.position_setpoint_x = 50
-        self.position_setpoint_y = 50
+        self.position_setpoint_y = -50
         self.position_setpoint_z = -120
 
         """ Create timer and logger """
@@ -64,20 +64,20 @@ class OffboardControl(Node):
     def vehicle_status_callback(self, vehicle_status):
         self.vehicle_status = vehicle_status
 
-    def publish_trajectory_setpoint(self, x:float, y:float, z:float, vx:float, vy:float, vz:float):
-        """Publish the trajectory setpoint."""
+    def publish_position_setpoint(self, x:float, y:float, z:float):
+        """Publish trajectory setpoint."""
         msg = TrajectorySetpoint()
         msg.position[0] = x
         msg.position[1] = y
         msg.position[2] = z
 
-        msg.velocity[0] = vx
-        msg.velocity[1] = vy
-        msg.velocity[2] = vz
+        msg.velocity[0] = float(np.nan)
+        msg.velocity[1] = float(np.nan)
+        msg.velocity[2] = float(np.nan)
 
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.trajectory_setpoint_publisher.publish(msg)
-        self.get_logger().info(f"Publishing positions: {[x, y, z]} \nPublishing velocities: {[vx, vy, vz]}")
+        self.get_logger().info(f"Publishing position setpoints: {[x, y, z]}")
 
     def timer_callback(self):
         """ Timer callback to publish heartbeat and trajectory commands """
@@ -85,7 +85,7 @@ class OffboardControl(Node):
 
         if self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             """ Command vehicle to go to some xyz position """
-            self.publish_trajectory_setpoint(
+            self.publish_position_setpoint(
                 x = float(self.position_setpoint_x),
                 y = float(self.position_setpoint_y),
                 z = float(self.position_setpoint_z)
