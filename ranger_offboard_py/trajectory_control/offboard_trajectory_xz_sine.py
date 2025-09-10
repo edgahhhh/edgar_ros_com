@@ -36,8 +36,8 @@ class OffboardControl(Node):
         
         if self.mode == 0 or self.mode == 2:
             # Sine wave trajectory in z plane
-            self.position_setpoint_x = np.nan
-            self.position_setpoint_y = np.nan
+            self.position_setpoint_x = 0
+            self.position_setpoint_y = 0
 
             self.trajectory_t = 0   # initialize time
             self.trajectory_period = 50    # s
@@ -52,7 +52,7 @@ class OffboardControl(Node):
 
 
 
-        self.dx = self.x_target / self.period   # m/s
+        # self.dx = self.x_target / self.period   # m/s
 
         """ Create timer and logger """
         self.timer_period = 0.1

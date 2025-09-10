@@ -3,7 +3,7 @@ from rclpy.node import Node
 
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 
-from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleLocalPosition, VehicleStatus, VehicleCommand
+from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleStatus
 
 import numpy as np
 
@@ -26,14 +26,10 @@ class OffboardControl(Node):
             TrajectorySetpoint, '/fmu/in/trajectory_setpoint', qos_profile
             )
         """ Create subscribers """
-        self.vehicle_local_position_subscriber = self.create_subscription(
-            VehicleLocalPosition, '/fmu/out/vehicle_local_position', self.vehicle_local_position_callback, qos_profile
-        )
         self.vehicle_status_subscriber = self.create_subscription(
             VehicleStatus, '/fmu/out/vehicle_status', self.vehicle_status_callback, qos_profile
         )
         """ Initialize variables """
-        self.vehicle_local_position = VehicleLocalPosition()
         self.vehicle_status = VehicleStatus()
 
         self.position_setpoint_x = 50

@@ -33,7 +33,8 @@ class OffboardControl(Node):
         self.vehicle_status = VehicleStatus()
 
         self.orbit_radius= 25  # Radius (m)
-        self.orbit_velocity= 2*np.pi*self.orbit_param1*20    # Velocity (m/s)
+        self.orbit_velocity= 2*np.pi*self.orbit_radius*20    # Velocity (m/s
+        self.orbit_velocity = 25
         self.orbit_yaw_behavior= np.nan    # yaw behavior
         self.orbit_x_position= 50        # Latitude/X
         self.orbit_y_position= 50        # Longitude/Y
@@ -92,12 +93,12 @@ class OffboardControl(Node):
 
         if self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             """ Command do_orbit """
-            self.publish_do_orbit(radius=self.orbit_radius, 
-                                  velocity=self.orbit_velocity,
-                                  yaw_behavior=self.orbit_yaw_behavior,
-                                  x_position=self.orbit_x_position,
-                                  y_position=self.orbit_y_position,
-                                  z_position=self.orbit_z_position)
+            self.publish_do_orbit(radius=float(self.orbit_radius), 
+                                  velocity=float(self.orbit_velocity),
+                                  yaw_behavior=float(self.orbit_yaw_behavior),
+                                  x_position=float(self.orbit_x_position),
+                                  y_position=float(self.orbit_y_position),
+                                  z_position=float(self.orbit_z_position))
             
             
 def main(args=None):

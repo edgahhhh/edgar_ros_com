@@ -34,7 +34,7 @@ class OffboardControl(Node):
 
         self.rate_period = 5   # s
         self.rate_amp = 1  # rad/s
-        self.rate_omega = 2*np.pi/self.rates_period    # rad/s
+        self.rate_omega = 2*np.pi/self.rate_period    # rad/s
 
         self.rate_t = 0 # s
         self.rate_setpoint_roll = 0
@@ -55,7 +55,7 @@ class OffboardControl(Node):
         msg.attitude = False
         msg.body_rate = True
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-        self.offboard_contr
+        self.offboard_control_mode_publisher.publish(msg)
 
     def vehicle_status_callback(self, vehicle_status):
         """ vehicle status callback """
@@ -87,7 +87,7 @@ class OffboardControl(Node):
 
             self.rate_t = self.rate_t + self.timer_period
             
-            self.publish_roll_rate(self.rate_setpoint_roll)
+            self.publish_roll_rate(self.rate_setpoint_roll, self, )
 
 def main(args=None):
     print('Starting offbaord control mode... ')
