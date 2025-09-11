@@ -33,7 +33,7 @@ class OffboardControl(Node):
         
         self.speed_type = 0 # 0=Airspeed, 1=Groundspeed
         self.target_airspeed = 20   # m/s
-        self.target_throttle = -1   # 0-1, (-1 = not controlled)
+        self.target_throttle = 0.7   # 0-1, (-1 = not controlled)
 
         """ Create timer and logger """
         self.timer_period = 0.1
@@ -49,6 +49,7 @@ class OffboardControl(Node):
         msg.acceleration = False
         msg.attitude = False
         msg.body_rate = False
+        msg.thrust_and_torque = True
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.offboard_control_mode_publisher.publish(msg)
 
@@ -77,17 +78,14 @@ class OffboardControl(Node):
         msg.from_external = True
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.vehicle_command_publisher.publish(msg)
+        self.get_logger().info(f"Publishing vehicle command: {command} \nparams: {params}")
 
     def publish_do_change_speed(self, SpeedType, Speed, Throttle):
-        """ 
-        Publish do_change_speed vehicle command 
-        
-        @param SpeedType: 0=Airspeed, 1=GroundSpeed
-        @param Speed: Speed in m/s (-1 indicates no change)
-        @param Throttle: norm throttle (-1 indicates no change)
-
-        """
-        self.publish_vehicle_command(command = 178, param1 = SpeedType, param2 = Speed, param3 = Throttle)
+        """  Publish do_change_speed vehicle command """
+        self.publish_vehicle_command(command = 178, 
+                                     param1 = float(SpeedType), 
+                                     param2 = float(Speed), 
+                                     param3 = float(Throttle))
 
     def timer_callback(self):
         """ Timer callback to publish heartbeat and trajectory commands """

@@ -3,7 +3,7 @@ from rclpy.node import Node
 
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 
-from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleLocalPosition, VehicleStatus, VehicleCommand
+from px4_msgs.msg import OffboardControlMode, VehicleStatus, VehicleCommand
 
 import numpy as np
 
@@ -33,12 +33,11 @@ class OffboardControl(Node):
         self.vehicle_status = VehicleStatus()
 
         self.orbit_radius= 25  # Radius (m)
-        self.orbit_velocity= 2*np.pi*self.orbit_radius*20    # Velocity (m/s
-        self.orbit_velocity = 25
-        self.orbit_yaw_behavior= np.nan    # yaw behavior
-        self.orbit_x_position= 50        # Latitude/X
-        self.orbit_y_position= 50        # Longitude/Y
-        self.orbit_z_position= -120      # Altitude/Z
+        self.orbit_velocity = 25    # velocity (m/s)
+        self.orbit_yaw_behavior= 2    # yaw behavior, 2 = uncontrolled?
+        self.orbit_x_position= 0        # Latitude/X
+        self.orbit_y_position= -0        # Longitude/Y
+        self.orbit_z_position= -80      # Altitude/Z
 
         """ Create timer and logger """
         self.timer_period = 0.1
@@ -85,7 +84,13 @@ class OffboardControl(Node):
 
     def publish_do_orbit(self, radius, velocity, yaw_behavior, x_position, y_position, z_position):
         """ Publish do orbit vehicle command """
-        self.publish_vehicle_command(command=34, param1=radius, param2=velocity, param3=yaw_behavior, param5=x_position, param6=y_position, param7=z_position)
+        self.publish_vehicle_command(command=34, 
+                                     param1=radius, 
+                                     param2=velocity, 
+                                     param3=yaw_behavior, 
+                                     param5=x_position, 
+                                     param6=y_position, 
+                                     param7=z_position)
 
     def timer_callback(self):
         """ Timer callback to publish heartbeat and trajectory commands """

@@ -9,7 +9,7 @@ import numpy as np
 
 from transforms3d.euler import euler2quat
 
-class OffboardControl(node):
+class OffboardControl(Node):
     def __init__(self):
         super().__init__('offboard_control_node')
         """ Configure QOS profile """
@@ -44,9 +44,16 @@ class OffboardControl(node):
         self.euler_setpoint_w = np.pi/2
 
         self.quant_setpoint_qd = np.zeros(4)
+        self.quant_setpoint_to_pub = [1, 1, 1, 1]
         
-        self.thrust_norm_x = 0.6
+        self.thrust_norm_x = 0.9
 
+        """ Create attitude timer """
+        self.attitude_timer_freq = 2
+        self.attitude_timer_period = 1/ self.attitude_timer_freq
+        self.attitude_timer = self.create_timer(
+            self.attitude_timer_period, self.attitude_timer_callback
+        )
         """ Create timer and logger """
         self.timer_freq = 10    # HZ
         self.timer_period = 1/self.timer_freq
@@ -64,16 +71,16 @@ class OffboardControl(node):
         msg.attitude = False
         msg.body_rate = True
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-        self.offboard_contr
+        self.offboard_control_mode_publisher.publish(msg)
 
     def vehicle_status_callback(self, vehicle_status):
         """ vehicle status callback """
         self.vehicle_status = vehicle_status
 
-    def publish_vehicle_attitude_setpoint(self, quaternion:float, thrust_norm_x:float):
+    def publish_vehicle_attitude_setpoint(self, quaternion:np.float32, thrust_norm_x:float):
         """ publish attitude setpoint """
         msg = VehicleAttitudeSetpoint()
-        msg.q_s = quaternion
+        msg.q_d = quaternion
         msg.thrust_body[0] = thrust_norm_x
         msg.thrust_body[1] = float(0)
         msg.thrust_body[2] = float(0)
@@ -86,13 +93,15 @@ class OffboardControl(node):
         """ timer callback, publish heartbeat and attitude setpoint """
         self.publish_heartbeat()
 
+    def attitude_timer_callback(self):
+        """ attitude timer callback, to publish attitude commands """
         if self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             """ Calculate and command quaternion """
             self.euler_setpoint_q = self.roll_min+self.roll_amp*np.sin(self.roll_omega*self.roll_t)
 
             self.quant_setpoint_qd = euler2quat(self.euler_setpoint_q, self.euler_setpoint_r, self.euler_setpoint_w)
 
-            self.publish_vehicle_attitude_setpoint(float(self.quant_setpoint_qd), float(self.thrust_norm_x))
+            self.publish_vehicle_attitude_setpoint(self.quant_setpoint_qd.astype(np.float32), float(self.thrust_norm_x))
 
             self.roll_t = self.roll_t + self.timer_period
 

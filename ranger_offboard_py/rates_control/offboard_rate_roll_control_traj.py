@@ -3,7 +3,7 @@ from rclpy.node import Node
 
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 
-from px4_msgs.msg import OffboardControlMode, VehicleRatesSetpoint, TrajectorySetpoint, VehicleStatus
+from px4_msgs.msg import OffboardControlMode, VehicleRatesSetpoint, TrajectorySetpoint, VehicleStatus, VehicleLocalPosition
 
 import numpy as np
 
@@ -32,9 +32,12 @@ class OffboardControl(Node):
         self.vehicle_status_subscriber = self.create_subscription(
             VehicleStatus, '/fmu/out/vehicle_status', self.vehicle_status_callback, qos_profile
         )
-
+        self.vehicle_local_position_subscriber = self.create_subscription(
+            VehicleLocalPosition, '/fmu/out/vehicle_local_position', self.vehicle_local_position_callback, qos_profile
+        )
         """ Initialize variables """
         self.vehicle_status = VehicleStatus()
+        self.vehicle_local_position = VehicleLocalPosition
 
         self.rate_period = 5   # s
         self.rate_amp = 0.25  # rad/s
@@ -44,6 +47,16 @@ class OffboardControl(Node):
         self.rate_setpoint_roll = 0
 
         self.norm_thrust_setpoint = 0.7
+
+        self.position_setpoint_x = 0
+        self.position_setpoint_y = 0
+        self.position_setpoint_z = -100
+
+        self.velocity_setpoint_x = 1
+        self.velocity_setpoint_y = 0
+        self.velocity_setpoint_z = 0
+
+        self.position_counter = 0
 
         """ Create rates timer """
         self.rates_timer_freq = 2   # Hz
@@ -108,6 +121,29 @@ class OffboardControl(Node):
     def timer_callback(self):
         """ timer callback """
         self.publish_heartbeat()
+
+        # if self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
+        #     """ Command roll rate  and trajectory """
+
+        #     self.position_setpoint_y = self.vehicle_local_position.y
+
+        #     if self.vehicle_local_position.x < 0:
+        #         self.position_setpoint_x = 300
+        #         self.velocity_setpoint_x = 1
+        #         self.position_counter = 0
+        #     elif self.vehicle_local_position.x > 300:
+        #         self.position_setpoint_x = 0
+        #         self.velocity_setpoint_x = -1
+        #         self.position_counter = 0
+
+        #     if self.position_counter == 0:
+        #         self.publish_trajectory_setpoint(float(self.position_setpoint_x),
+        #                                         float(self.position_setpoint_y),
+        #                                         float(self.position_setpoint_z), 
+        #                                         float(self.velocity_setpoint_x),
+        #                                         float(self.velocity_setpoint_y),
+        #                                         float(self.velocity_setpoint_z))
+        #         self.position_counter += 1
             
     def rates_timer_callback(self):
         """ Publish rates at a different Hz than heartbeat """

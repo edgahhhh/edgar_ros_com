@@ -7,6 +7,7 @@ from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleLocalPo
 
 import numpy as np
 
+# STATUS: NOT READY
 
 class OffboardControl(Node):
     def __init__(self):
@@ -39,9 +40,10 @@ class OffboardControl(Node):
         self.mode = 0   # 0=Constant Velocity, 1=Dynamic Velocity
         if self.mode == 0:
             # Constant velocity vector
-            self.velocity_setpoint_x = 1
-            self.velocity_setpoint_y = 1
-            self.velocity_setpoint_z = 1
+            self.velocity_setpoint_x = -1000
+            self.velocity_setpoint_y = -1000
+            self.velocity_setpoint_z = -1000
+
         elif self.mode == 1:
         # Velocity trajectory
             self.period = 100   # seconds
@@ -55,7 +57,7 @@ class OffboardControl(Node):
     def publish_heartbeat(self):
         """ offboard control mode message """
         msg = OffboardControlMode()
-        msg.position = False
+        msg.position = True
         msg.velocity = True
         msg.acceleration = False
         msg.attitude = False
@@ -73,9 +75,10 @@ class OffboardControl(Node):
     def publish_velocity_setpoint(self,vx:float, vy:float, vz:float):
         """Publish trajectory setpoint."""
         msg = TrajectorySetpoint()
-        msg.position[0] = float(np.nan)
-        msg.position[1] = float(np.nan)
-        msg.position[2] = float(np.nan)
+
+        msg.position[0] = float(self.vehicle_local_position.x)
+        msg.position[1] = float(self.vehicle_local_position.y)
+        msg.position[2] = float(self.vehicle_local_position.z)
 
         msg.velocity[0] = vx
         msg.velocity[1] = vy

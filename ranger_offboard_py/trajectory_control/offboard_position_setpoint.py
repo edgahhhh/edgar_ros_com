@@ -7,6 +7,10 @@ from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleStatus
 
 import numpy as np
 
+# STATUS: GOOD 
+    # Failing to recreate orbit by sending position message
+    # Orbit pops up for a second in mission planner then disappears
+    # Vehicle follows a wonky obrit about position point w/ tight radius
 
 class OffboardControl(Node):
     def __init__(self):
@@ -35,6 +39,8 @@ class OffboardControl(Node):
         self.position_setpoint_x = 50
         self.position_setpoint_y = -50
         self.position_setpoint_z = -120
+
+        self.send_position_counter = 0
 
         """ Create timer and logger """
         self.timer_period = 0.1
@@ -81,11 +87,17 @@ class OffboardControl(Node):
 
         if self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             """ Command vehicle to go to some xyz position """
-            self.publish_position_setpoint(
-                x = float(self.position_setpoint_x),
-                y = float(self.position_setpoint_y),
-                z = float(self.position_setpoint_z)
-                )
+            if self.send_position_counter == 0:
+                self.publish_position_setpoint(
+                    x = float(self.position_setpoint_x),
+                    y = float(self.position_setpoint_y),
+                    z = float(self.position_setpoint_z)
+                    )
+                self.send_position_counter += 0
+        else:
+            """ Reset counter when not in offboard mode """
+            self.send_position_counter = 0
+            
             
 def main(args=None):
     print('Starting offbaord control mode... ')
