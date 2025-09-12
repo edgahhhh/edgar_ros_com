@@ -52,16 +52,17 @@ class OffboardControl(Node):
         self.initialize_position_counter = 0
 
         self.trajectory_t = 0   # initialize time
+
         self.z_trajectory_period = 50    # s
         self.z_omega = 2*np.pi/self.z_trajectory_period
 
-        self.x_trajectory_period = 25  #
+        self.x_trajectory_period = 25  # s
         self.x_omega = 2*np.pi/self.x_trajectory_period
 
         if self.mode == 0 or self.mode == 2:
             # Initialize parameters for z trajectory
             self.z_min = -120    # m
-            self.z_amp = -20    # m
+            self.z_amp = -2.5    # m
 
         if self.mode == 1 or self.mode == 2:
             # Initialize parameters for x trajectory
@@ -142,7 +143,7 @@ class OffboardControl(Node):
 
 
 def main(args=None):
-    print('Starting offbaord control mode... ')
+    print('Starting offboard control mode... ')
 
     rclpy.init(args = args)
 

@@ -3,14 +3,15 @@ from rclpy.node import Node
 
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 
-from px4_msgs.msg import OffboardControlMode, VehicleStatus, VehicleCommand
+from px4_msgs.msg import VehicleStatus, VehicleCommand
 
 import numpy as np
 
+# STATUS: need to test on ubuntu
 
-class OffboardControl(Node):
+class CommandOrbit(Node):
     def __init__(self):
-        super().__init__('offboard_control_node')
+        super().__init__('command_orbit_node')
         """ Configure QOS profile """
         qos_profile = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -19,9 +20,6 @@ class OffboardControl(Node):
             depth=1
         )
         """ Create publishers """
-        self.offboard_control_mode_publisher = self.create_publisher(
-            OffboardControlMode, '/fmu/in/offboard_control_mode', qos_profile
-            )
         self.vehicle_command_publisher = self.create_publisher(
             VehicleCommand, '/fmu/in/vehicle_command', qos_profile
         )
@@ -33,34 +31,23 @@ class OffboardControl(Node):
         self.vehicle_status = VehicleStatus()
 
         self.orbit_radius= 25  # Radius (m)
-        self.orbit_velocity = 25    # velocity (m/s)
-        self.orbit_yaw_behavior= 2    # yaw behavior, 2 = uncontrolled?
-        self.orbit_x_position= 0        # Latitude/X
-        self.orbit_y_position= -0        # Longitude/Y
-        self.orbit_z_position= -80      # Altitude/Z
+        self.orbit_velocity = 15    # velocity (m/s)
+        self.orbit_yaw_behavior = 2    # yaw behavior, 2 = uncontrolled?
+        self.orbit_x_position= 100        # Latitude/X
+        self.orbit_y_position= -100        # Longitude/Y
+        self.orbit_z_position= -120      # Altitude/Z
+
+        self.orbit_counter = 0
 
         """ Create timer and logger """
         self.timer_period = 0.1
         self.timer = self.create_timer(
             self.timer_period , self.timer_callback)
-        self.get_logger().info('offboard_control_node started') 
+        self.get_logger().info('orbit_control_node started') 
 
-    def publish_heartbeat(self):
-        """ offboard control mode message """
-        msg = OffboardControlMode()
-        msg.position = False
-        msg.velocity = False
-        msg.acceleration = False
-        msg.attitude = False
-        msg.body_rate = False
-        msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-        self.offboard_control_mode_publisher.publish(msg)
 
-    """ Position callback """
-    def vehicle_local_position_callback(self, vehicle_local_position):
-        self.vehicle_local_position = vehicle_local_position
-    """ Status callback """
     def vehicle_status_callback(self, vehicle_status):
+        """ Status callback """
         self.vehicle_status = vehicle_status
 
     def publish_vehicle_command(self, command, **params) -> None:
@@ -91,31 +78,29 @@ class OffboardControl(Node):
                                      param5=x_position, 
                                      param6=y_position, 
                                      param7=z_position)
-
+    
     def timer_callback(self):
-        """ Timer callback to publish heartbeat and trajectory commands """
-        self.publish_heartbeat()
-
-        if self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
-            """ Command do_orbit """
-            self.publish_do_orbit(radius=float(self.orbit_radius), 
-                                  velocity=float(self.orbit_velocity),
-                                  yaw_behavior=float(self.orbit_yaw_behavior),
-                                  x_position=float(self.orbit_x_position),
-                                  y_position=float(self.orbit_y_position),
-                                  z_position=float(self.orbit_z_position))
+        if self.orbit_counter == 0:
+            """ publish orbit command """
+            self.publish_do_orbit(self.orbit_radius, 
+                                  self.orbit_velocity,
+                                  self.orbit_yaw_behavior,
+                                  self.orbit_x_position,
+                                  self.orbit_y_position,
+                                  self.orbit_z_position)
+            self.orbit_counter += 1
             
             
 def main(args=None):
-    print('Starting offboard control mode... ')
+    print('Starting command_orbit_node... ')
 
     rclpy.init(args = args)
 
-    offboard_control = OffboardControl()
+    command_orbit = CommandOrbit()
 
-    rclpy.spin(offboard_control)
+    rclpy.spin('command_orbit')
 
-    offboard_control.destroy_node()
+    command_orbit.destroy_node()
 
     rclpy.shutdown()
 

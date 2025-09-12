@@ -34,11 +34,11 @@ class OffboardControl(Node):
         self.vehicle_status = VehicleStatus()
 
         self.rate_period = 5   # s
-        self.rate_amp = 0.15  # rad/s
+        self.rate_amp = 0.1  # rad/s
         self.rate_omega = 2*np.pi/self.rate_period    # rad/s
         self.rate_time = 0 # s
 
-        self.setpoint_roll_rate = 0
+        self.setpoint_pitch_rate = 0
 
         self.setpoint_norm_thrust = 0.6
 
@@ -70,7 +70,7 @@ class OffboardControl(Node):
         """ vehicle status callback """
         self.vehicle_status = vehicle_status
 
-    def publish_roll_rate(self, roll_rate:float, thrust_norm_x:float, pitch_rate:float=0, yaw_rate:float=0):
+    def publish_pitch_rate(self, pitch_rate:float, thrust_norm_x:float, roll_rate:float=0, yaw_rate:float=0):
         """ publish body roll rate setpoint """
         msg = VehicleRatesSetpoint()
         msg.roll = roll_rate
@@ -90,9 +90,9 @@ class OffboardControl(Node):
         """ Publish rates at a slower Hz than heartbeat """
 
         if self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
-            self.setpoint_roll_rate = self.rate_amp*np.sin(self.rate_omega*self.rate_time)
+            self.setpoint_pitch_rate = self.rate_amp*np.sin(self.rate_omega*self.rate_time)
             
-            self.publish_roll_rate(float(self.setpoint_roll_rate), 
+            self.publish_pitch_rate(float(self.setpoint_pitch_rate), 
                                     float(self.setpoint_norm_thrust))
             
             self.rate_time += self.rates_timer_period

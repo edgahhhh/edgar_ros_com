@@ -33,20 +33,19 @@ class OffboardControl(Node):
         """ Initialize variables """
         self.vehicle_status = VehicleStatus()
 
-        self.roll_t = 0
-        self.roll_period = 15   # s
-        self.roll_omega = 2*np.pi/self.roll_period  # rad/s
-        self.roll_amp = np.pi*1/3   # rad
-        self.roll_min = np.pi/2     # rad
+        self.pitch_time = 0
+        self.pitch_period = 10   # s
+        self.pitch_omega = 2*np.pi/self.roll_period  # rad/s
+        self.pitch_amp = np.pi*1/6   # rad
+        self.pitch_min = 0    # rad
 
-        self.euler_setpoint_q = self.roll_min   # rad
-        self.euler_setpoint_r = 0
-        self.euler_setpoint_w = np.pi/2
+        self.euler_setpoint_p = np.pi/2   # roll, yaw
+        self.euler_setpoint_q = 0   # pitch, rad
+        self.euler_setpoint_r = np.pi/2 # yaw, rad
 
         self.quant_setpoint_qd = np.zeros(4)
-        self.quant_setpoint_to_pub = [1, 1, 1, 1]
         
-        self.thrust_norm_x = 0.9
+        self.thrust_norm_x = 0.6
 
         """ Create attitude timer """
         self.attitude_timer_freq = 2
@@ -55,10 +54,10 @@ class OffboardControl(Node):
             self.attitude_timer_period, self.attitude_timer_callback
         )
         """ Create timer and logger """
-        self.timer_freq = 10    # HZ
-        self.timer_period = 1/self.timer_freq
-        self.timer = self.create_timer(
-            self.timer_period , self.timer_callback)
+        self.attitude_timer_freq = 10    # HZ
+        self.attitude_timer_period = 1/self.attitude_timer_freq
+        self.attitude_timer = self.create_timer(
+            self.attitude_timer_period , self.attitude_timer_callback)
         self.get_logger().info('offboard_control_node started') 
 
 
@@ -97,13 +96,13 @@ class OffboardControl(Node):
         """ attitude timer callback, to publish attitude commands """
         if self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             """ Calculate and command quaternion """
-            self.euler_setpoint_q = self.roll_min+self.roll_amp*np.sin(self.roll_omega*self.roll_t)
+            self.euler_setpoint_q = self.pitch_min + self.pitch_amp*np.sin(self.pitch_omega*self.pitch_time)
 
-            self.quant_setpoint_qd = euler2quat(self.euler_setpoint_q, self.euler_setpoint_r, self.euler_setpoint_w)
+            self.quant_setpoint_qd = euler2quat(self.euler_setpoint_p, self.euler_setpoint_q, self.euler_setpoint_r)
 
             self.publish_vehicle_attitude_setpoint(self.quant_setpoint_qd.astype(np.float32), float(self.thrust_norm_x))
 
-            self.roll_t = self.roll_t + self.timer_period
+            self.pitch_time += self.attitude_timer_period
 
 
 def main(args=None):
