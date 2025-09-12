@@ -36,8 +36,8 @@ class OffboardControl(Node):
         """ Initialize variables """
         self.vehicle_status = VehicleStatus()
 
-        self.position_setpoint_x = 50
-        self.position_setpoint_y = -50
+        self.position_setpoint_x = 75
+        self.position_setpoint_y = -75
         self.position_setpoint_z = -120
 
         self.send_position_counter = 0

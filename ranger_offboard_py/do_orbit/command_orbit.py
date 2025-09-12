@@ -7,11 +7,12 @@ from px4_msgs.msg import VehicleStatus, VehicleCommand
 
 import numpy as np
 
-# STATUS: need to test on ubuntu
+# STATUS: READY
 
-class CommandOrbit(Node):
+class OffboardControl(Node):
     def __init__(self):
-        super().__init__('command_orbit_node')
+        super().__init__('offboard_control_node')
+        """ Configure QOS profile """
         """ Configure QOS profile """
         qos_profile = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -34,8 +35,9 @@ class CommandOrbit(Node):
         self.orbit_velocity = 15    # velocity (m/s)
         self.orbit_yaw_behavior = 2    # yaw behavior, 2 = uncontrolled?
         self.orbit_x_position= 100        # Latitude/X
-        self.orbit_y_position= -100        # Longitude/Y
-        self.orbit_z_position= -120      # Altitude/Z
+        self.orbit_x_position = 31.475496
+        self.orbit_y_position= -106.046384        # Longitude/Y
+        self.orbit_z_position= 120      # Altitude/Z
 
         self.orbit_counter = 0
 
@@ -68,8 +70,9 @@ class CommandOrbit(Node):
         msg.from_external = True
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.vehicle_command_publisher.publish(msg)
+        self.get_logger().info(f'Publishing command: {command} \nparameters: {params}')
 
-    def publish_do_orbit(self, radius, velocity, yaw_behavior, x_position, y_position, z_position):
+    def publish_do_orbit(self, radius:float, velocity:float, yaw_behavior:float, x_position:float, y_position:float, z_position:float):
         """ Publish do orbit vehicle command """
         self.publish_vehicle_command(command=34, 
                                      param1=radius, 
@@ -78,31 +81,33 @@ class CommandOrbit(Node):
                                      param5=x_position, 
                                      param6=y_position, 
                                      param7=z_position)
+
     
     def timer_callback(self):
         if self.orbit_counter == 0:
             """ publish orbit command """
-            self.publish_do_orbit(self.orbit_radius, 
-                                  self.orbit_velocity,
-                                  self.orbit_yaw_behavior,
-                                  self.orbit_x_position,
-                                  self.orbit_y_position,
-                                  self.orbit_z_position)
-            self.orbit_counter += 1
+            self.publish_do_orbit(float(self.orbit_radius), 
+                                  float(self.orbit_velocity),
+                                  float(self.orbit_yaw_behavior),
+                                  float(self.orbit_x_position),
+                                  float(self.orbit_y_position),
+                                  float(self.orbit_z_position))
+            self.orbit_counter += 0
             
             
 def main(args=None):
-    print('Starting command_orbit_node... ')
+    print('Starting offboard control mode... ')
 
     rclpy.init(args = args)
 
-    command_orbit = CommandOrbit()
+    offboard_control = OffboardControl()
 
-    rclpy.spin('command_orbit')
+    rclpy.spin(offboard_control)
 
-    command_orbit.destroy_node()
+    offboard_control.destroy_node()
 
     rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
+

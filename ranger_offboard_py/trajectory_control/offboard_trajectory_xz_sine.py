@@ -56,7 +56,7 @@ class OffboardControl(Node):
         self.z_trajectory_period = 50    # s
         self.z_omega = 2*np.pi/self.z_trajectory_period
 
-        self.x_trajectory_period = 25  # s
+        self.x_trajectory_period = 30  # s
         self.x_omega = 2*np.pi/self.x_trajectory_period
 
         if self.mode == 0 or self.mode == 2:

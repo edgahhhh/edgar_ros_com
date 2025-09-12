@@ -7,9 +7,10 @@ from px4_msgs.msg import VehicleStatus, VehicleCommand
 
 import numpy as np
 
-class ChangeAirspeed(Node):
+# STATUS ready
+class OffboardControl(Node):
     def __init__(self):
-        super().__init__('change_airspeed_node')
+        super().__init__('offboard_control_node')
         """ Configure QOS profile """
         qos_profile = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -35,7 +36,7 @@ class ChangeAirspeed(Node):
         """ Initialize variables """
         self.vehicle_status = VehicleStatus()
 
-        self.airspeed_period = 15   # s
+        self.airspeed_period = 30   # s
         self.airspeed_omega = 2 * np.pi / self.airspeed_period  # rad/s
         self.airspeed_time = 0  # s
         self.airspeed_mid = 18  # m/s
@@ -68,10 +69,10 @@ class ChangeAirspeed(Node):
         self.vehicle_command_publisher.publish(msg)
         self.get_logger().info(f"Publishing vehicle command: {command} \nparams: {params}")
 
-    def publish_do_change_speed(self, Speed:float, Throttle:float, SpeedType:float=0):
+    def publish_do_change_speed(self, Speed:float, Throttle:float):
         """  Publish do_change_speed vehicle command """
         self.publish_vehicle_command(command = 178, 
-                                     param1 = SpeedType, 
+                                     param1 = float(0), 
                                      param2 = Speed, 
                                      param3 = Throttle)
 
@@ -79,21 +80,20 @@ class ChangeAirspeed(Node):
         """ Publish orbit command as sine wave """
         self.setpoint_airspeed = self.airspeed_mid + self.airspeed_amp*np.sin(self.airspeed_omega*self.airspeed_time)
 
-        self.publish_do_change_speed(self.setpoint_airspeed, self.setpoint_throttle)
+        self.publish_do_change_speed(float(self.setpoint_airspeed), float(self.setpoint_throttle))
         
         self.airspeed_time += self.change_airspeed_timer_period
         
-
 def main(args=None):
-    print('Starting change_airspeed_node... ')
+    print('Starting offboard control mode... ')
 
     rclpy.init(args = args)
 
-    change_airspeed = ChangeAirspeed()
+    offboard_control = OffboardControl()
 
-    rclpy.spin('change_airspeed')
+    rclpy.spin(offboard_control)
 
-    change_airspeed.destroy_node()
+    offboard_control.destroy_node()
 
     rclpy.shutdown()
 
