@@ -39,7 +39,7 @@ class OffboardControl(Node):
         self.airspeed_period = 30   # s
         self.airspeed_omega = 2 * np.pi / self.airspeed_period  # rad/s
         self.airspeed_time = 0  # s
-        self.airspeed_mid = 18  # m/s
+        self.airspeed_mid = 16  # m/s
         self.airspeed_amp = 2   # m/s
 
         self.setpoint_airspeed = self.airspeed_mid  # m/s

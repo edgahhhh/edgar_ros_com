@@ -31,7 +31,7 @@ class OffboardControl(Node):
         """ Initialize variables """
         self.vehicle_status = VehicleStatus()
 
-        self.orbit_radius= 25  # Radius (m)
+        self.orbit_radius= 50  # Radius (m)
         self.orbit_velocity = 15    # velocity (m/s)
         self.orbit_yaw_behavior = 2    # yaw behavior, 2 = uncontrolled?
         self.orbit_x_position= 100        # Latitude/X
